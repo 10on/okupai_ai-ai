@@ -29,7 +29,7 @@
         <string>-hf</string>
         <string>unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M</string>
         <string>--host</string>
-        <string>192.168.8.122</string>
+        <string><AI_MAC_IP></string>
         <string>--port</string>
         <string>8080</string>
         <string>-c</string>

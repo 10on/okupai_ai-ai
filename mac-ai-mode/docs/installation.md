@@ -41,7 +41,7 @@ network, power settings, GPU limit and disk.
 Edit `~/.aimode/config/config.json`:
 
 - `api.host` — bind address for the inference API. Use the LAN/Ethernet IP so other
-  devices can reach it (e.g. `192.168.8.122`). Use `127.0.0.1` to keep it local-only.
+  devices can reach it (e.g. `<AI_MAC_IP>`). Use `127.0.0.1` to keep it local-only.
 - `api.port` — default `8080`.
 - `api.api_key` — set a token to require `Authorization: Bearer <token>`. Recommended on a LAN.
 - `llama.ctx_size`, `llama.parallel`, `llama.n_gpu_layers`, `llama.flash_attn`.

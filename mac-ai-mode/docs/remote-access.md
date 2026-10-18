@@ -15,14 +15,14 @@ or `sudo launchctl load -w /System/Library/LaunchDaemons/ssh.plist`.
 On the AI Mac the public key lives in `~/.ssh/authorized_keys`. From the client:
 
 ```bash
-ssh-copy-id you@192.168.8.122     # once
+ssh-copy-id you@<AI_MAC_IP>     # once
 ```
 
 `~/.ssh/config` on the client:
 
 ```
 Host ai-mac
-    HostName 192.168.8.122
+    HostName <AI_MAC_IP>
     User you
     IdentityFile ~/.ssh/id_rsa
     ServerAliveInterval 30
@@ -53,7 +53,7 @@ ssh ai-mac aimode off
 With AI Mode on, the OpenAI-compatible API is at `http://<api.host>:<api.port>`:
 
 ```bash
-curl http://192.168.8.122:8080/v1/chat/completions \
+curl http://<AI_MAC_IP>:8080/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer <api_key if set>' \
   -d '{"model":"aimode","messages":[{"role":"user","content":"hi"}]}'
