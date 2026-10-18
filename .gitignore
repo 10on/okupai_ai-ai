@@ -1,0 +1,15 @@
+# Build artifacts
+mac-ai-mode/bin/
+*.test
+*.out
+
+# Go
+/vendor/
+
+# Runtime data (normally lives in ~/.aimode, never in-repo)
+*.log
+*.pid
+state.json
+
+# macOS
+.DS_Store

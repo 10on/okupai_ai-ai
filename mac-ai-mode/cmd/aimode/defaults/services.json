@@ -1,0 +1,34 @@
+{
+  "_comment": "Apps quit gracefully on `aimode on` to free RAM. Derived from the machine audit. Edit ~/.aimode/config/services.json to taste. Names are macOS application names (as shown in Activity Monitor / System Events).",
+
+  "apps": [
+    "Firefox",
+    "Spotify",
+    "Telegram",
+    "Cursor",
+    "Docker Desktop",
+    "AnycubicSlicerNext",
+    "IINA",
+    "QuickTime Player"
+  ],
+
+  "_launchd_comment": "User LaunchAgents to disable for the duration of AI Mode, re-enabled on `off`. Empty by default — nothing is touched until you opt in.",
+  "launchd_user": [],
+
+  "_never_comment": "Safety net. If any resolved target matches one of these substrings (case-insensitive), aimode refuses to stop it. Protects SSH, the graphics stack, power, audio, remote-access tools and the terminal aimode runs in.",
+  "never": [
+    "ssh",
+    "sshd",
+    "WindowServer",
+    "loginwindow",
+    "powerd",
+    "coreaudiod",
+    "bluetoothd",
+    "AnyDesk",
+    "TeamViewer",
+    "Splashtop",
+    "iTerm",
+    "Terminal",
+    "aimode"
+  ]
+}

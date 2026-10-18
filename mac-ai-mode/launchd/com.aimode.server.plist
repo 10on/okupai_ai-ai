@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OPTIONAL launchd template for running the inference server with crash-restart.
+
+  The current `aimode` MVP starts/stops llama-server directly (fork+exec, tracked by PID).
+  For launchd-managed crash-restart with back-off (ТЗ §6/§7), install this as a USER agent:
+
+    cp launchd/com.aimode.server.plist ~/Library/LaunchAgents/
+    # edit ProgramArguments below: absolute llama-server path, your model, host/port
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.aimode.server.plist   # load
+    launchctl kickstart -k gui/$(id -u)/com.aimode.server                             # restart
+    launchctl bootout gui/$(id -u)/com.aimode.server                                  # unload/stop
+
+  KeepAlive(SuccessfulExit=false) + ThrottleInterval gives a bounded restart loop:
+  it restarts on crash but waits 15s between attempts, so a model that can't load
+  does not spin forever.
+
+  This template pins ONE model. When wiring it to aimode, replace RunAtLoad with
+  on-demand bootstrap/bootout from `aimode on`/`off`.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.aimode.server</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/llama-server</string>
+        <string>-hf</string>
+        <string>unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M</string>
+        <string>--host</string>
+        <string>192.168.8.122</string>
+        <string>--port</string>
+        <string>8080</string>
+        <string>-c</string>
+        <string>8192</string>
+        <string>-np</string>
+        <string>2</string>
+        <string>-ngl</string>
+        <string>99</string>
+        <string>-fa</string>
+        <string>on</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>15</integer>
+
+    <key>ProcessType</key>
+    <string>Interactive</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/REPLACE_ME/.aimode/logs/server.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/REPLACE_ME/.aimode/logs/server.log</string>
+</dict>
+</plist>

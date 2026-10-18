@@ -1,0 +1,24 @@
+{
+  "api": {
+    "host": "192.168.8.122",
+    "port": 8080,
+    "api_key": ""
+  },
+  "llama": {
+    "ctx_size": 8192,
+    "parallel": 2,
+    "n_gpu_layers": 99,
+    "flash_attn": true,
+    "extra_args": []
+  },
+  "default_model": "fast",
+  "power": {
+    "caffeinate": true,
+    "wired_limit_mb": 57344
+  },
+  "restart": {
+    "max_restarts": 5,
+    "window_seconds": 60
+  },
+  "start_timeout_seconds": 300
+}
