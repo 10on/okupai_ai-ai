@@ -1,39 +1,20 @@
 # okupai_ai-ai
 
-Two-machine AI setup:
+Two-machine AI setup. This file describes the repo for working **on** it; it deliberately does not
+tell agents to use the local LLM — that is opt-in per session via `/local` (see `nas-agents/`).
 
-- `mac-ai-mode/` — a Mac M1 Max runs `aimode`: starts/stops a local llama.cpp server
-  (OpenAI-compatible API) and frees memory for it. Controlled over SSH:
-  `ssh ai-mac aimode on|off|status|switch <profile>`.
-- `nas-agents/` — the NAS side: agents run by hand in a console session and call that
-  API over the LAN. No orchestration here — just the connection layer.
+- `mac-ai-mode/` — Go CLI `aimode` for the Mac M1 Max: frees memory, starts/stops a local llama.cpp
+  server (OpenAI-compatible API), model profiles in `cmd/aimode/defaults/models.json`. macOS-only.
+- `nas-agents/` — NAS side: `aimode-mcp` (Go MCP server, gated off by default), the async job
+  worker, the headless browser agent (`browser/`, Node + playwright-core), prompt templates and
+  `scripts/install.sh` that registers everything in Claude Code and Codex.
+- `.claude/commands/local.md`, `.claude/skills/local-*` — the `/local` command and offload skills
+  (linked into `~/.claude` by install.sh).
+- `docs/local-offload-spec.md` — the spec for the offload layer; `docs/benchmarks.md` — model numbers.
 
-## Using the local LLM from here (aimode)
+Build: `cd mac-ai-mode && go build -o bin/aimode ./cmd/aimode`;
+`cd nas-agents/aimode-mcp && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ../bin/aimode-mcp .`
 
-Before calling the API, connect once per shell session:
-
-```bash
-cd nas-agents
-source scripts/connect.sh     # exports OPENAI_BASE_URL / OPENAI_API_KEY, checks /health
-```
-
-If `/health` fails, AI Mode is probably off: `ssh ai-mac aimode on [profile]`.
-
-Exported env vars only last for that one real shell — if you're issuing requests from
-separate, non-persistent invocations (e.g. one-off tool calls rather than an interactive
-session), re-read `nas-agents/config.env` and pass the values explicitly each time instead
-of relying on inherited env.
-
-### Model profiles — pick based on the task
-
-| Profile   | Use for                                             | Notes |
-|-----------|------------------------------------------------------|-------|
-| `fast`    | quick Q&A, short transforms, low latency              | ~2.5 GB, instant |
-| `coding`  | code generation, agentic/tool-use tasks               | MoE, strong at code |
-| `browser` | tasks that need to *see* a screenshot/page            | vision, needs mmproj |
-| `brain`   | hardest reasoning, long/complex tasks, quality > speed| ~8-10 tok/s, slow to load |
-
-Switch without leaving AI Mode: `ssh ai-mac aimode switch <profile>`. Switching reloads the
-model (tens of seconds to minutes) — pick up front, don't switch mid-task.
-
-Full API/auth details: `mac-ai-mode/docs/remote-access.md`.
+Testing anything that runs `aimode on`: use an isolated `AIMODE_HOME` whose config you have
+verified (empty `apps`, `wired_limit_mb: 0`, another port) and `--dry-run` first — a real `on`
+quits the Mac's apps.

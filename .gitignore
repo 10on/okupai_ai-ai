@@ -19,3 +19,6 @@ mac-ai-mode/docs/audit.md
 
 # NAS-side connection config (host/key are local network details)
 nas-agents/config.env
+nas-agents/bin/
+nas-agents/browser/node_modules/
+nas-agents/browser/package-lock.json

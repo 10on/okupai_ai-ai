@@ -55,11 +55,12 @@ With AI Mode on, the OpenAI-compatible API is at `http://<api.host>:<api.port>`:
 ```bash
 curl http://<AI_MAC_IP>:8080/v1/chat/completions \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <api_key if set>' \
+  -H 'Authorization: Bearer <api.api_key>' \
   -d '{"model":"aimode","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-Point CLI agents, editors and scripts at this base URL. **Do not expose it to the
+`/health` is unauthenticated; everything under `/v1` needs the key. Point CLI agents, editors and
+scripts at this base URL. NAS agents reach it through `nas-agents/` (aimode-mcp). **Do not expose it to the
 internet** — keep it on the LAN or behind a VPN/tunnel.
 
 ## Management HTTP API

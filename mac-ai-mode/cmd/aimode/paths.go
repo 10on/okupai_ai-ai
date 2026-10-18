@@ -16,6 +16,7 @@ type Paths struct {
 	PidFile    string // ~/.aimode/server.pid
 	AppLog     string // ~/.aimode/logs/aimode.log
 	ServerLog  string // ~/.aimode/logs/server.log
+	APIKeyFile string // ~/.aimode/api_key — written from config for llama-server
 }
 
 func resolvePaths() (Paths, error) {
@@ -37,6 +38,7 @@ func resolvePaths() (Paths, error) {
 	}
 	p.AppLog = filepath.Join(p.LogDir, "aimode.log")
 	p.ServerLog = filepath.Join(p.LogDir, "server.log")
+	p.APIKeyFile = filepath.Join(base, "api_key")
 	for _, d := range []string{p.Home, p.ConfigDir, p.LogDir} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			return Paths{}, err

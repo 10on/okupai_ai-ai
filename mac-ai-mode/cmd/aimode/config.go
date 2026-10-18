@@ -18,11 +18,11 @@ type APIConfig struct {
 }
 
 type LlamaConfig struct {
-	CtxSize     int      `json:"ctx_size"`
-	Parallel    int      `json:"parallel"`
-	NGpuLayers  int      `json:"n_gpu_layers"`
-	FlashAttn   bool     `json:"flash_attn"`
-	ExtraArgs   []string `json:"extra_args"`
+	CtxSize    int      `json:"ctx_size"`
+	Parallel   int      `json:"parallel"`
+	NGpuLayers int      `json:"n_gpu_layers"`
+	FlashAttn  bool     `json:"flash_attn"`
+	ExtraArgs  []string `json:"extra_args"`
 }
 
 type PowerConfig struct {
@@ -50,6 +50,12 @@ type Model struct {
 	MMProj      string `json:"mmproj"` // vision projector for multimodal (VL) models
 	CtxSize     int    `json:"ctx_size"`
 	Description string `json:"description"`
+
+	// Per-profile overrides of the global llama settings (zero value = use global).
+	Parallel   int      `json:"parallel,omitempty"`
+	CacheTypeK string   `json:"cache_type_k,omitempty"` // e.g. "q8_0" — quantized KV cache
+	CacheTypeV string   `json:"cache_type_v,omitempty"`
+	ExtraArgs  []string `json:"extra_args,omitempty"`
 }
 
 type ModelsConfig struct {

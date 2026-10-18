@@ -43,14 +43,16 @@ Edit `~/.aimode/config/config.json`:
 - `api.host` — bind address for the inference API. Use the LAN/Ethernet IP so other
   devices can reach it (e.g. `<AI_MAC_IP>`). Use `127.0.0.1` to keep it local-only.
 - `api.port` — default `8080`.
-- `api.api_key` — set a token to require `Authorization: Bearer <token>`. Recommended on a LAN.
-- `llama.ctx_size`, `llama.parallel`, `llama.n_gpu_layers`, `llama.flash_attn`.
+- `api.api_key` — set a token to require `Authorization: Bearer <token>`. Required once the API is on
+  the LAN (`api.host` = LAN IP). aimode hands it to llama-server via `~/.aimode/api_key` (0600), never argv.
+- `llama.ctx_size`, `llama.parallel` (keep 1: llama-server splits the context across slots),
+  `llama.n_gpu_layers`, `llama.flash_attn`.
 - `power.caffeinate` — keep the machine awake while AI Mode is on.
 - `power.wired_limit_mb` — see below.
 
 Edit `~/.aimode/config/services.json` to curate which apps are quit on `on`.
 
-## 5. GPU wired-memory limit (for `brain` / 70B-class only)
+## 5. GPU wired-memory limit (for `brain` / `heavy` only)
 
 By default macOS lets the GPU use ~48 GB of the 64 GB. A 70B-class model needs more.
 To raise it, set `power.wired_limit_mb` (e.g. `57344` = 56 GB) and allow passwordless sysctl:

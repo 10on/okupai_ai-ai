@@ -22,12 +22,12 @@ Usage:
 Flags:
   --dry-run, -n            show what would happen without changing anything
   --yes, -y                assume yes (reserved for interactive prompts)
-  --json                   machine-readable output (status) for orchestrating agents
+  --json                   machine-readable output (status, models) for orchestrating agents
 
 Config lives in ~/.aimode/config/ (created on first run).
 `
 
-var version = "0.1.0"
+var version = "0.2.0"
 
 func main() {
 	var (
@@ -88,7 +88,11 @@ func main() {
 	case "doctor":
 		err = app.cmdDoctor()
 	case "models":
-		err = app.cmdModels()
+		if jsonOut {
+			err = app.cmdModelsJSON()
+		} else {
+			err = app.cmdModels()
+		}
 	case "switch":
 		if len(rest) == 0 {
 			err = fmt.Errorf("switch needs a model name (see `aimode models`)")

@@ -1,0 +1,11 @@
+[Unit]
+Description=aimode async job worker (local LLM on the Mac)
+After=network-online.target
+
+[Service]
+ExecStart=@BIN@ worker
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

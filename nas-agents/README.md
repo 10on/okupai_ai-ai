@@ -1,45 +1,63 @@
 # nas-agents
 
-The NAS-side half of the setup: AI agents run **by hand, in a console session on the NAS**
-(same way you'd run Claude Code) and talk to the `aimode` inference API on the Mac over the LAN.
-There's no orchestration layer here on purpose — the Mac side (`mac-ai-mode/`) owns the model and
-the API; this side just needs to be pointed at it correctly before each session.
+The NAS side of the setup. Claude Code and Codex run here; by default they never touch the Mac.
+Local-LLM offload is switched on per session with `/local` and goes through one MCP server,
+`aimode-mcp`, which enforces the gating itself.
 
-Different tools/agents will be used over time (CLI coding agents, scripts, maybe a browser
-agent later) — this directory only standardizes *how they connect*, not what they do.
+```
+nas-agents/
+├── aimode-mcp/        Go source of the MCP server + job worker (no dependencies)
+├── bin/aimode-mcp     linux/amd64 build (gitignored)
+├── browser/agent.mjs  headless browser agent for local_browse (playwright-core)
+├── templates/         prompt templates per profile, filled by the cloud agent
+├── systemd/           aimode-worker.service template
+├── scripts/install.sh registers everything in Claude Code + Codex
+├── scripts/connect.sh exports OPENAI_BASE_URL/KEY for plain OpenAI-compatible tools
+└── config.env         local settings (gitignored) — copy config.example.env
+```
 
-## Setup
+Spec: [`../docs/local-offload-spec.md`](../docs/local-offload-spec.md).
+
+## Install / update
 
 ```bash
+# build (anywhere with Go 1.27)
+cd nas-agents/aimode-mcp && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o ../bin/aimode-mcp .
+
+# on the NAS
 cd nas-agents
-cp config.example.env config.env
-# edit config.env: AI_MAC_HOST (and AI_MAC_API_KEY if the Mac's api_key is set)
+cp config.example.env config.env   # AI_MAC_HOST, AI_MAC_USER, AI_MAC_API_KEY (= Mac's api.api_key), AI_MAC_AIMODE
+scripts/install.sh
 ```
 
-## Before each session
+`install.sh` is idempotent: `Host ai-mac` in `~/.ssh/config`, `npm install` for the browser agent,
+`claude mcp add -s user aimode`, `codex mcp add aimode` (with `AIMODE_MCP_LIST_ALL=1`), links `/local`
+and the `local-*` skills into `~/.claude` (and `/local` into `~/.codex/prompts`), and starts the
+`aimode-worker` systemd user service.
+
+## Using it
+
+In an agent session:
+
+| Command | Mode | Mac unavailable → |
+|---|---|---|
+| `/local off` (default) | off | all work in the cloud; only `local_enable` is visible |
+| `/local` | prefer | the cloud does the work itself |
+| `/local strict` | strict | no cloud fallback: queue (`local_submit`) or stop |
+
+The skills (`local-offload`, `local-research`, `local-batch`, `local-code-draft`, `local-browser`,
+`local-transcribe`) are always visible to the agent but check the mode first and never enable it.
+
+Useful by hand:
 
 ```bash
-source scripts/connect.sh
+bin/aimode-mcp report 7                         # what got offloaded, verdicts per skill
+systemctl --user status aimode-worker           # async job worker
+journalctl --user -u aimode-worker -f
+ls ~/.local/share/aimode-mcp/jobs/{queued,running,done}
 ```
 
-This exports `OPENAI_BASE_URL` / `OPENAI_API_KEY` for any OpenAI-compatible CLI tool and checks
-`aimode`'s `/health` endpoint, so you find out immediately if AI Mode isn't on yet
-(`ssh ai-mac aimode on`) instead of an agent failing confusingly mid-task.
+## Plain OpenAI-compatible tools
 
-## Notes
-
-- `config.env` is gitignored — it holds a real LAN host/IP, keep it local.
-- If a tool doesn't read `OPENAI_BASE_URL`/`OPENAI_API_KEY`, check its docs for the equivalent
-  flags/env vars and point them at the same values by hand.
-- See `../mac-ai-mode/docs/remote-access.md` for the Mac-side API details (auth, LAN-only, etc).
-
-## If the agent running here is Claude Code or Codex
-
-This repo's root `AGENTS.md` (imported by `CLAUDE.md`) teaches both tools about `aimode` and
-the model profiles automatically, every session, with no extra step.
-
-On top of that, for Claude Code specifically:
-
-- `/aimode` — a command that connects, checks health, and lists the profiles on demand.
-- The `aimode` skill (`.claude/skills/aimode/`) — same knowledge, but also auto-triggers when
-  the task looks like it should be delegated to the local LLM, so Claude can suggest it unprompted.
+`source scripts/connect.sh` still exports `OPENAI_BASE_URL` / `OPENAI_API_KEY` and checks `/health`,
+for tools that aren't MCP clients. AI Mode has to be on (`ssh ai-mac aimode on [profile]`).

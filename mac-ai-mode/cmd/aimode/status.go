@@ -1,11 +1,14 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,20 +20,20 @@ func (a *App) cmdStatusJSON() error {
 	sw, _ := swapStats()
 	ready := a.healthOK()
 	out := map[string]any{
-		"mode":             st.Mode,
-		"model":            st.Model,
-		"ready":            ready && st.Mode == ModeReady,
-		"api":              a.apiBase(),
-		"api_healthy":      ready,
-		"server_pid":       st.ServerPID,
-		"server_alive":     pidAlive(st.ServerPID),
-		"ram_total_bytes":  mem.TotalBytes,
-		"ram_used_bytes":   mem.UsedBytes,
-		"ram_avail_bytes":  mem.AvailableBytes,
-		"ram_free_pct":     mem.FreePct,
-		"pressure":         mem.PressureLabel,
-		"swap_used_bytes":  sw.UsedBytes,
-		"swap_active":      sw.Active,
+		"mode":            st.Mode,
+		"model":           st.Model,
+		"ready":           ready && st.Mode == ModeReady,
+		"api":             a.apiBase(),
+		"api_healthy":     ready,
+		"server_pid":      st.ServerPID,
+		"server_alive":    pidAlive(st.ServerPID),
+		"ram_total_bytes": mem.TotalBytes,
+		"ram_used_bytes":  mem.UsedBytes,
+		"ram_avail_bytes": mem.AvailableBytes,
+		"ram_free_pct":    mem.FreePct,
+		"pressure":        mem.PressureLabel,
+		"swap_used_bytes": sw.UsedBytes,
+		"swap_active":     sw.Active,
 	}
 	if st.Mode == ModeReady && !st.Since.IsZero() {
 		out["uptime_seconds"] = int(time.Since(st.Since).Seconds())
@@ -105,43 +108,105 @@ func (a *App) modelDownloaded(m Model) bool {
 		}
 		return true
 	}
-	// A completed HF download has a resolvable snapshot symlink to a .gguf. While
-	// downloading, only a blobs/*.incomplete file exists and no snapshot link, so
-	// os.Stat (which follows symlinks) correctly reports "not downloaded".
+	// A completed HF download has resolvable snapshot symlinks to .gguf files. While
+	// downloading, only blobs/*.incomplete exist and no snapshot link, so os.Stat
+	// (which follows symlinks) correctly reports "not downloaded". Large quants are
+	// split ("<name>-00001-of-00003.gguf", often in a subfolder): all parts must resolve.
 	home, _ := os.UserHomeDir()
 	base := filepath.Join(home, ".cache", "huggingface", "hub", hfCacheName(m.HF))
-	matches, _ := filepath.Glob(filepath.Join(base, "snapshots", "*", "*.gguf"))
-	for _, p := range matches {
-		if _, err := os.Stat(p); err == nil { // follows symlink -> fails if incomplete
-			return true
+	tag := ""
+	if parts := strings.SplitN(m.HF, ":", 2); len(parts) == 2 {
+		tag = strings.ToLower(parts[1])
+	}
+	found := false
+	splits := map[string]map[string]bool{} // split total -> parts that resolve
+	_ = filepath.WalkDir(filepath.Join(base, "snapshots"), func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".gguf") {
+			return nil
+		}
+		name := filepath.Base(p)
+		if strings.Contains(name, "mmproj") || (tag != "" && !strings.Contains(strings.ToLower(p), tag)) {
+			return nil
+		}
+		if _, err := os.Stat(p); err != nil {
+			return nil
+		}
+		if mm := splitRe.FindStringSubmatch(name); mm != nil {
+			if splits[mm[2]] == nil {
+				splits[mm[2]] = map[string]bool{}
+			}
+			splits[mm[2]][mm[1]] = true
+			return nil
+		}
+		found = true
+		return nil
+	})
+	for total, got := range splits {
+		if n, err := strconv.Atoi(total); err == nil && len(got) == n {
+			found = true
 		}
 	}
-	return false
+	return found
 }
 
-func (a *App) cmdModels() error {
+var splitRe = regexp.MustCompile(`-(\d{5})-of-(\d{5})\.gguf$`)
+
+type profileInfo struct {
+	Name        string `json:"name"`
+	Downloaded  bool   `json:"downloaded"`
+	Active      bool   `json:"active"`
+	Vision      bool   `json:"vision"`
+	CtxSize     int    `json:"ctx_size"`
+	Source      string `json:"source"`
+	Description string `json:"description"`
+}
+
+func (a *App) profiles() []profileInfo {
 	st, _ := loadState(a.Paths)
 	names := make([]string, 0, len(a.Models.Models))
 	for k := range a.Models.Models {
 		names = append(names, k)
 	}
 	sort.Strings(names)
-	fmt.Printf("%-10s %-9s %-7s %s\n", "PROFILE", "STATE", "ACTIVE", "SOURCE")
+	out := make([]profileInfo, 0, len(names))
 	for _, name := range names {
 		m := a.Models.Models[name]
-		state := "not downloaded"
-		if a.modelDownloaded(m) {
-			state = "downloaded"
-		}
-		active := ""
-		if st.Mode == ModeReady && st.Model == name {
-			active = "*"
-		}
 		src := m.HF
 		if src == "" {
 			src = m.Path
 		}
-		fmt.Printf("%-10s %-9s %-7s %s\n", name, state, active, src)
+		out = append(out, profileInfo{
+			Name:        name,
+			Downloaded:  a.modelDownloaded(m),
+			Active:      st.Mode == ModeReady && st.Model == name,
+			Vision:      m.MMProj != "",
+			CtxSize:     cmp.Or(m.CtxSize, a.Cfg.Llama.CtxSize),
+			Source:      src,
+			Description: m.Description,
+		})
+	}
+	return out
+}
+
+// cmdModelsJSON prints the profiles for an orchestrating agent (local_capabilities).
+func (a *App) cmdModelsJSON() error {
+	data, _ := json.MarshalIndent(a.profiles(), "", "  ")
+	fmt.Println(string(data))
+	return nil
+}
+
+func (a *App) cmdModels() error {
+	fmt.Printf("%-10s %-14s %-7s %s\n", "PROFILE", "STATE", "ACTIVE", "SOURCE")
+	for _, p := range a.profiles() {
+		state := "not downloaded"
+		if p.Downloaded {
+			state = "downloaded"
+		}
+		active := ""
+		if p.Active {
+			active = "*"
+		}
+		fmt.Printf("%-10s %-14s %-7s %s\n", p.Name, state, active, p.Source)
 	}
 	return nil
 }

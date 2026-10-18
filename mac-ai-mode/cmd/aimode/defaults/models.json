@@ -3,23 +3,32 @@
     "fast": {
       "hf": "unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M",
       "ctx_size": 8192,
-      "description": "Small, instant replies. Smoke-tests Metal."
+      "description": "Small, instant replies: short Q&A, transforms, batch items. Loads in seconds."
     },
     "coding": {
       "hf": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M",
       "ctx_size": 16384,
-      "description": "MoE, fast for its size, strong at code and agentic tasks."
-    },
-    "brain": {
-      "hf": "bartowski/Qwen2.5-72B-Instruct-GGUF:Q4_K_M",
-      "ctx_size": 8192,
-      "description": "Qwen2.5-72B-Instruct, ~47 GB weights. The 'brain' — highest quality that fits 64 GB. Needs iogpu.wired_limit_mb raised (~56 GB); expect ~8-10 tok/s."
+      "description": "MoE, fast for its size, strong at code and agentic tasks. Loads in tens of seconds."
     },
     "browser": {
       "path": "~/.aimode/models/qwen3.5-27b/Qwen3.5-27B-Q4_K_M.gguf",
       "mmproj": "~/.aimode/models/qwen3.5-27b/mmproj-F16.gguf",
       "ctx_size": 16384,
       "description": "Qwen3.5-27B vision model (~17.7 GB). Sees page screenshots — for browser/GUI agents. mmproj required."
+    },
+    "brain": {
+      "hf": "unsloth/Qwen3.5-122B-A10B-GGUF:UD-IQ3_S",
+      "ctx_size": 32768,
+      "cache_type_k": "q8_0",
+      "cache_type_v": "q8_0",
+      "description": "Qwen3.5-122B-A10B MoE, Unsloth dynamic 3-bit (~46.6 GB). Hardest reasoning, long context; thinking on by default. Needs iogpu.wired_limit_mb raised (~56 GB). Loads in minutes."
+    },
+    "heavy": {
+      "hf": "bartowski/Qwen2.5-72B-Instruct-GGUF:Q4_K_M",
+      "ctx_size": 8192,
+      "cache_type_k": "q8_0",
+      "cache_type_v": "q8_0",
+      "description": "Qwen2.5-72B-Instruct dense (~47 GB), the previous brain. Short-context hard questions only; ~8-10 tok/s. Needs the raised wired limit. Loads in minutes."
     }
   }
 }

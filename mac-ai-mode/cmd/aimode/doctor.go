@@ -20,12 +20,12 @@ func (a *App) cmdDoctor() error {
 	}
 
 	// llama-server
-	if path, err := exec.LookPath("llama-server"); err == nil {
-		ver, _ := run(5*time.Second, "llama-server", "--version")
+	if path, err := findLlamaServer(); err == nil {
+		ver, _ := run(5*time.Second, path, "--version")
 		line := firstLine(ver)
 		add("llama-server", true, path+"  "+line)
 	} else {
-		add("llama-server", false, "not in PATH — brew install llama.cpp")
+		add("llama-server", false, err.Error())
 	}
 
 	// caffeinate

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -40,7 +41,7 @@ func (a *App) serverArgs(name string, m Model) []string {
 		"--host", host,
 		"--port", strconv.Itoa(a.Cfg.API.Port),
 		"-c", strconv.Itoa(ctx),
-		"-np", strconv.Itoa(max(1, a.Cfg.Llama.Parallel)),
+		"-np", strconv.Itoa(max(1, cmp.Or(m.Parallel, a.Cfg.Llama.Parallel))),
 		"-ngl", strconv.Itoa(a.Cfg.Llama.NGpuLayers),
 		"--alias", name,
 	}
@@ -55,10 +56,18 @@ func (a *App) serverArgs(name string, m Model) []string {
 	if a.Cfg.Llama.FlashAttn {
 		args = append(args, "-fa", "on")
 	}
+	if m.CacheTypeK != "" {
+		args = append(args, "-ctk", m.CacheTypeK)
+	}
+	if m.CacheTypeV != "" {
+		args = append(args, "-ctv", m.CacheTypeV)
+	}
 	if a.Cfg.API.APIKey != "" {
-		args = append(args, "--api-key", a.Cfg.API.APIKey)
+		// Via a 0600 file, not argv: argv is visible in ps and printed by --dry-run.
+		args = append(args, "--api-key-file", a.Paths.APIKeyFile)
 	}
 	args = append(args, a.Cfg.Llama.ExtraArgs...)
+	args = append(args, m.ExtraArgs...)
 	return args
 }
 
@@ -85,10 +94,29 @@ func (a *App) healthOK() bool {
 	return resp.StatusCode == http.StatusOK
 }
 
+// findLlamaServer looks in PATH, then in the Homebrew prefixes: a non-interactive
+// `ssh ai-mac aimode on` gets a bare PATH without /opt/homebrew/bin.
+func findLlamaServer() (string, error) {
+	if p, err := exec.LookPath("llama-server"); err == nil {
+		return p, nil
+	}
+	for _, p := range []string{"/opt/homebrew/bin/llama-server", "/usr/local/bin/llama-server"} {
+		if _, err := os.Stat(p); err == nil {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("llama-server not found in PATH or Homebrew prefixes (brew install llama.cpp)")
+}
+
 func (a *App) startServer(name string, m Model) (int, error) {
-	bin, err := exec.LookPath("llama-server")
+	bin, err := findLlamaServer()
 	if err != nil {
-		return 0, fmt.Errorf("llama-server not found in PATH (brew install llama.cpp)")
+		return 0, err
+	}
+	if a.Cfg.API.APIKey != "" {
+		if err := os.WriteFile(a.Paths.APIKeyFile, []byte(a.Cfg.API.APIKey+"\n"), 0o600); err != nil {
+			return 0, err
+		}
 	}
 	args := a.serverArgs(name, m)
 

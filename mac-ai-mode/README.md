@@ -34,7 +34,7 @@ aimode on [model]     # free resources, start the LLM (default model if omitted)
 aimode off            # stop the LLM, restore managed settings
 aimode status         # mode, model, memory, pressure, swap, API health
 aimode doctor         # diagnose deps, network, power, GPU, disk
-aimode models         # list profiles + download state
+aimode models         # list profiles + download state (--json for agents)
 aimode switch <model> # swap the active model without leaving AI Mode
 aimode logs [N]       # tail logs
 aimode benchmark      # prompt/gen tokens-per-second -> JSON
@@ -56,7 +56,11 @@ ssh ai-mac aimode switch coding
 | `fast`    | Qwen3-4B-Instruct Q4_K_M             | instant replies, ~2.5 GB |
 | `coding`  | Qwen3-Coder-30B-A3B-Instruct Q4_K_M  | MoE, fast, strong at code |
 | `browser` | Qwen3.5-27B (vision) + mmproj        | sees page screenshots, for browser/GUI agents, ~17.7 GB |
-| `brain`   | Qwen2.5-72B-Instruct Q4_K_M          | the "brain" — top quality that fits 64 GB; needs the GPU wired-limit raised, ~8-10 tok/s |
+| `brain`   | Qwen3.5-122B-A10B UD-IQ3_S           | MoE, ~46.6 GB, ctx 32k, KV q8_0 — top quality that fits; needs the GPU wired-limit raised |
+| `heavy`   | Qwen2.5-72B-Instruct Q4_K_M          | the previous brain, dense ~47 GB, ~8-10 tok/s — to be removed once `brain` is validated |
+
+Per-profile keys override the global `llama` settings: `ctx_size`, `parallel`, `cache_type_k`/`cache_type_v`
+(quantized KV cache), `extra_args`. `aimode models --json` lists profiles for agents.
 
 Models download on first use via llama.cpp's `-hf` into the Hugging Face cache.
 
