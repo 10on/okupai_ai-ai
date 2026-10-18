@@ -32,10 +32,10 @@ Keep in the cloud (even in strict mode, tell the user instead of offloading):
 
 # Planning
 
-1. Split the task; tag each subtask with a profile: `fast` | `coding` | `browser` | `brain` | `heavy`
+1. Split the task; tag each subtask with a profile: `fast` | `coding` | `browser` | `brain`
    (or service `whisper`). See `local_capabilities` for what each is and whether it's downloaded.
 2. Only one model is loaded at a time. Group subtasks by profile and order them to minimise switches,
-   cheapest-to-load first unless dependencies force otherwise. `brain`/`heavy` load in minutes.
+   cheapest-to-load first unless dependencies force otherwise. `brain` loads in minutes.
 3. Show the user the plan in one or two lines before starting long local work.
 4. Use `template` + `vars` in `local_run` where a template fits — fewer cloud tokens, steadier output.
 5. Long or non-urgent batches → `local_submit` (async; the NAS worker groups by profile).

@@ -52,7 +52,7 @@ Edit `~/.aimode/config/config.json`:
 
 Edit `~/.aimode/config/services.json` to curate which apps are quit on `on`.
 
-## 5. GPU wired-memory limit (for `brain` / `heavy` only)
+## 5. GPU wired-memory limit (for `brain` only)
 
 By default macOS lets the GPU use ~48 GB of the 64 GB. A 70B-class model needs more.
 To raise it, set `power.wired_limit_mb` (e.g. `57344` = 56 GB) and allow passwordless sysctl:

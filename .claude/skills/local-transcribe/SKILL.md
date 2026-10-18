@@ -18,5 +18,5 @@ without asking, in either mode.
 4. Prefer: spot-check a few timestamped quotes against the .txt. Strict: report as unverified.
 5. `local_feedback` with the verdict.
 
-Whisper needs ~2 GB next to the loaded model — fine with every profile except possibly `brain`/`heavy`;
+Whisper needs ~2 GB next to the loaded model — fine with every profile except possibly `brain`;
 if memory is tight, transcribe everything first, then load the big profile.

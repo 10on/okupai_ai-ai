@@ -10,5 +10,4 @@ Add a row per run: `aimode benchmark` (JSON lands in `~/.aimode/logs/bench-*.jso
 | 2026-10-18 | browser | Qwen3.6-35B-A3B UD-Q4_K_M + mmproj-F16 | 16k | 17 s | 125 | 41.8 | same browse tasks: HN top-5 17 s (was 103 s), follow-link 17 s (was 90 s), Wikipedia search → first sentence in 4 steps, 65 s |
 | 2026-10-18 | whisper | ggml-large-v3-turbo (whisper.cpp, Metal) | — | — | — | — | 9 s of Russian speech in ~1.5–2 s on the Mac; end-to-end from the NAS (mp4/mp3) ~3 s |
 | — | brain | Qwen3.5-122B-A10B UD-IQ3_S | 32k | — | — | — | pending: needs a real `aimode on brain` |
-| — | heavy | Qwen2.5-72B-Instruct Q4_K_M | 8k | — | — | ~8–10 (earlier) | compare with brain, then remove |
 | 2026-10-18 | coding | Qwen3-Coder-30B-A3B Q4_K_M | 16k | 11 s | 105 | 74 | correct Go rune-reversal on first try |

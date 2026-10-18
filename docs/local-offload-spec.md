@@ -120,10 +120,9 @@ one batch per profile, don't switch mid-task.
 | `coding` | Qwen3-Coder-30B-A3B Q4_K_M | code drafts, agentic tasks | 11 s; ~74 tok/s |
 | `browser` | Qwen3.6-35B-A3B UD-Q4_K_M + mmproj (vision, MoE 3B active) | page/screenshot understanding | 17 s; ~42 tok/s, one vision browse step ~8–17 s |
 | `brain` | Qwen3.5-122B-A10B UD-IQ3_S (~46.6 GB), ctx 32k, KV q8_0 | hardest reasoning, long-doc synthesis | minutes (not yet live-tested) |
-| `heavy` | Qwen2.5-72B-Instruct Q4_K_M (~47 GB), ctx 8k, KV q8_0 | — | to be removed after `brain` is validated |
 
 Choice of `brain`: the freshest model with the most parameters that fits the 56 GB GPU wired limit
-with room for context. Qwen3.5-122B-A10B at Unsloth dynamic 3-bit beats the dense 72B at roughly the
+with room for context. Qwen3.5-122B-A10B at Unsloth dynamic 3-bit beats the previous brain, dense Qwen2.5-72B (removed 2026-10-18), at roughly the
 same size and, with 10B active parameters, should be several times faster. Rejected:
 gpt-oss-120B (~63 GB, over the limit); Mistral Small 4 119B (Q3 ≈ 50–55 GB, known Metal output bug in
 llama.cpp); Qwen3.6-27B / Qwen3.8-27B (fresher but small).
@@ -156,7 +155,6 @@ profile, mode, duration, model load time, input/output size, ok. `local_feedback
 
 ## 12. Open
 
-- Old `browser` files (Qwen3.5-27B, ~18.6 GB in `~/.aimode/models/qwen3.5-27b`) are unused — delete together with `heavy`.
-- Live validation of `brain` (needs a real `aimode on brain`), then remove `heavy` and its 47 GB.
+- Live validation of `brain` (needs a real `aimode on brain`, which quits the managed apps).
 - "Busy" flag for interactive Mac use.
 - Mirror the skills for Codex if it is used beyond fallback.

@@ -24,7 +24,7 @@ const (
 )
 
 const batchingRules = " Only one model is loaded at a time and switching costs seconds (fast) to " +
-	"minutes (brain/heavy): plan first, group subtasks by profile, run each group as one batch, " +
+	"minutes (brain): plan first, group subtasks by profile, run each group as one batch, " +
 	"don't switch mid-task."
 
 type toolDef struct {
@@ -72,7 +72,7 @@ func (s *Server) allTools() []toolDef {
 		{Name: "local_ensure_profile", Description: "Make <profile> the loaded model. No-op if already active; otherwise " +
 			"`aimode on`/`aimode switch` on the Mac (turning AI Mode on quits the Mac's managed apps) and waits for health. " +
 			"Returns seconds spent loading." + batchingRules,
-			InputSchema: obj(map[string]any{"profile": str("fast | coding | browser | brain | heavy (see local_capabilities)")}, "profile")},
+			InputSchema: obj(map[string]any{"profile": str("fast | coding | browser | brain (see local_capabilities)")}, "profile")},
 		{Name: "local_run", Description: "One chat completion on the currently loaded model. Never switches models: " +
 			"pass `profile` to assert which one you expect (error if different). Prefer `template`+`vars` over hand-written " +
 			"prompts. Output is a draft for you to verify (prefer mode)." + batchingRules,

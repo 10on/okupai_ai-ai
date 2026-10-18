@@ -169,7 +169,7 @@ func (c Config) ensureProfile(profile string) (float64, string, error) {
 		}
 	}
 	start := time.Now()
-	// brain/heavy load ~47 GB from disk; aimode's own health timeout is the real bound.
+	// brain loads ~46 GB from disk; aimode's own health timeout is the real bound.
 	if _, err := c.sshAimode(20*time.Minute, args...); err != nil {
 		return time.Since(start).Seconds(), "", err
 	}

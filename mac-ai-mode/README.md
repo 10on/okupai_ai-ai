@@ -58,7 +58,6 @@ ssh ai-mac aimode switch coding
 | `coding`  | Qwen3-Coder-30B-A3B-Instruct Q4_K_M  | MoE, fast, strong at code |
 | `browser` | Qwen3.6-35B-A3B (vision) + mmproj    | MoE 3B active, sees page screenshots, for browser/GUI agents, ~23 GB, ~42 tok/s |
 | `brain`   | Qwen3.5-122B-A10B UD-IQ3_S           | MoE, ~46.6 GB, ctx 32k, KV q8_0 — top quality that fits; needs the GPU wired-limit raised |
-| `heavy`   | Qwen2.5-72B-Instruct Q4_K_M          | the previous brain, dense ~47 GB, ~8-10 tok/s — to be removed once `brain` is validated |
 
 Per-profile keys override the global `llama` settings: `ctx_size`, `parallel`, `cache_type_k`/`cache_type_v`
 (quantized KV cache), `extra_args`. `aimode models --json` lists profiles for agents.
