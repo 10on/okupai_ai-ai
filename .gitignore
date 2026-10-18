@@ -16,3 +16,6 @@ state.json
 
 # Local machine audit (contains real network/host details)
 mac-ai-mode/docs/audit.md
+
+# NAS-side connection config (host/key are local network details)
+nas-agents/config.env
