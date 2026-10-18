@@ -38,6 +38,7 @@ aimode models         # list profiles + download state (--json for agents)
 aimode switch <model> # swap the active model without leaving AI Mode
 aimode logs [N]       # tail logs
 aimode benchmark      # prompt/gen tokens-per-second -> JSON
+aimode transcribe f.m4a [ru]   # speech-to-text via ffmpeg + whisper.cpp (brew install whisper-cpp)
 aimode on --dry-run   # show the plan, change nothing
 ```
 
@@ -55,7 +56,7 @@ ssh ai-mac aimode switch coding
 |---|---|---|
 | `fast`    | Qwen3-4B-Instruct Q4_K_M             | instant replies, ~2.5 GB |
 | `coding`  | Qwen3-Coder-30B-A3B-Instruct Q4_K_M  | MoE, fast, strong at code |
-| `browser` | Qwen3.5-27B (vision) + mmproj        | sees page screenshots, for browser/GUI agents, ~17.7 GB |
+| `browser` | Qwen3.6-35B-A3B (vision) + mmproj    | MoE 3B active, sees page screenshots, for browser/GUI agents, ~23 GB, ~42 tok/s |
 | `brain`   | Qwen3.5-122B-A10B UD-IQ3_S           | MoE, ~46.6 GB, ctx 32k, KV q8_0 — top quality that fits; needs the GPU wired-limit raised |
 | `heavy`   | Qwen2.5-72B-Instruct Q4_K_M          | the previous brain, dense ~47 GB, ~8-10 tok/s — to be removed once `brain` is validated |
 

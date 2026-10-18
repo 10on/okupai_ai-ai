@@ -20,5 +20,9 @@
     "max_restarts": 5,
     "window_seconds": 60
   },
-  "start_timeout_seconds": 300
+  "start_timeout_seconds": 300,
+  "whisper": {
+    "model": "~/.aimode/models/whisper/ggml-large-v3-turbo.bin",
+    "threads": 0
+  }
 }

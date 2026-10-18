@@ -30,6 +30,10 @@ cp config.example.env config.env   # AI_MAC_HOST, AI_MAC_USER, AI_MAC_API_KEY (=
 scripts/install.sh
 ```
 
+Updating just the binary while the worker runs: copy to `bin/aimode-mcp.new`, then
+`mv -f bin/aimode-mcp.new bin/aimode-mcp && systemctl --user restart aimode-worker`
+(writing over a running executable fails with "text file busy").
+
 `install.sh` is idempotent: `Host ai-mac` in `~/.ssh/config`, `npm install` for the browser agent,
 `claude mcp add -s user aimode`, `codex mcp add aimode` (with `AIMODE_MCP_LIST_ALL=1`), links `/local`
 and the `local-*` skills into `~/.claude` (and `/local` into `~/.codex/prompts`), and starts the
@@ -45,7 +49,8 @@ In an agent session:
 | `/local` | prefer | the cloud does the work itself |
 | `/local strict` | strict | no cloud fallback: queue (`local_submit`) or stop |
 
-The skills (`local-offload`, `local-research`, `local-batch`, `local-code-draft`, `local-browser`,
+Tools also include `local_transcribe` (Whisper on the Mac for any audio/video on the NAS) and
+`local_browse`. The skills (`local-offload`, `local-research`, `local-batch`, `local-code-draft`, `local-browser`,
 `local-transcribe`) are always visible to the agent but check the mode first and never enable it.
 
 Useful by hand:

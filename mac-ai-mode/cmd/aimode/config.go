@@ -30,6 +30,11 @@ type PowerConfig struct {
 	WiredLimitMB int  `json:"wired_limit_mb"`
 }
 
+type WhisperConfig struct {
+	Model   string `json:"model"`   // ggml model file for whisper.cpp
+	Threads int    `json:"threads"` // 0 = whisper-cli default
+}
+
 type RestartConfig struct {
 	MaxRestarts   int `json:"max_restarts"`
 	WindowSeconds int `json:"window_seconds"`
@@ -41,6 +46,7 @@ type Config struct {
 	DefaultModel        string        `json:"default_model"`
 	Power               PowerConfig   `json:"power"`
 	Restart             RestartConfig `json:"restart"`
+	Whisper             WhisperConfig `json:"whisper"`
 	StartTimeoutSeconds int           `json:"start_timeout_seconds"`
 }
 

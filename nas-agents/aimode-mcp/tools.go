@@ -121,6 +121,16 @@ func (s *Server) allTools() []toolDef {
 				"allow_submit": map[string]any{"type": "boolean", "description": "Allow submitting forms / login / purchase actions (requires explicit user OK)"},
 				"skill":        skill,
 			}, "instruction")},
+		{Name: "local_transcribe", Description: "Speech-to-text with Whisper (large-v3-turbo) on the Mac. Takes an audio " +
+			"or video file on the NAS (any ffmpeg format), keeps timestamps, writes .txt/.srt/.json transcripts on the NAS " +
+			"and returns their paths plus a short preview — read only what you need from the files. Works without " +
+			"loading an LLM profile; much faster than real time.",
+			InputSchema: obj(map[string]any{
+				"path":       str("Audio/video file on the NAS"),
+				"language":   str("ISO code (ru, en, ...) or auto (default)"),
+				"output_dir": str("Where to write transcripts (default ~/.local/share/aimode-mcp/transcripts)"),
+				"skill":      skill,
+			}, "path")},
 		{Name: "local_feedback", Description: "Record how a local result turned out, for usage tracking: accepted, fixed " +
 			"(you corrected it), redone (done in the cloud instead), unverified (strict mode).",
 			InputSchema: obj(map[string]any{
@@ -272,6 +282,26 @@ func (s *Server) callTool(name string, raw json.RawMessage) (string, bool) {
 			"finished_recent": brief(done)}), false
 	case "local_browse":
 		return s.toolBrowse(mode, raw)
+	case "local_transcribe":
+		var a struct {
+			Path      string `json:"path"`
+			Language  string `json:"language"`
+			OutputDir string `json:"output_dir"`
+			Skill     string `json:"skill"`
+		}
+		_ = json.Unmarshal(raw, &a)
+		start := time.Now()
+		res, err := s.cfg.transcribe(a.Path, a.Language, a.OutputDir)
+		ev := MetricEvent{Kind: "transcribe", Skill: a.Skill, Profile: "whisper", Mode: mode,
+			DurationMS: time.Since(start).Milliseconds(), OK: err == nil}
+		if err != nil {
+			s.cfg.logMetric(ev)
+			return s.unavailable(mode, err), true
+		}
+		ev.ID, _ = res["id"].(string)
+		ev.OutChars, _ = res["chars"].(int)
+		s.cfg.logMetric(ev)
+		return toJSON(res), false
 	case "local_feedback":
 		var a struct {
 			ID, Verdict, Skill, Note string
@@ -452,7 +482,7 @@ func (s *Server) capabilities() string {
 	browser := nodeErr == nil && agentErr == nil && pwErr == nil
 	out["services"] = map[string]any{
 		"browser": browser,
-		"whisper": false, // planned on the Mac; local-transcribe must stop when false
+		"whisper": st.Availability != AvailUnreachable && s.cfg.whisperAvailable(),
 	}
 	out["job_worker_running"] = s.cfg.workerAlive()
 	out["templates"] = s.cfg.listTemplates()

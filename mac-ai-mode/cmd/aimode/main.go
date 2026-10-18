@@ -17,6 +17,8 @@ Usage:
   aimode switch <model>    swap the active model without leaving AI Mode
   aimode logs [N]          tail the last N lines of the logs (default 40)
   aimode benchmark         measure prompt/gen tokens-per-second, save JSON
+  aimode transcribe <file> [lang]  speech-to-text (ffmpeg + whisper.cpp), prints JSON
+  aimode services          on-demand services (whisper) — use with --json
   aimode version           print version
 
 Flags:
@@ -107,6 +109,18 @@ func main() {
 			}
 		}
 		err = app.cmdLogs(n)
+	case "transcribe":
+		if len(rest) == 0 {
+			err = fmt.Errorf("transcribe needs an audio or video file")
+			break
+		}
+		lang := ""
+		if len(rest) > 1 {
+			lang = rest[1]
+		}
+		err = app.cmdTranscribe(rest[0], lang)
+	case "services":
+		err = app.cmdServicesJSON()
 	case "benchmark", "bench":
 		err = app.cmdBenchmark()
 	default:

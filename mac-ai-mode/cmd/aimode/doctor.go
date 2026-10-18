@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -26,6 +27,13 @@ func (a *App) cmdDoctor() error {
 		add("llama-server", true, path+"  "+line)
 	} else {
 		add("llama-server", false, err.Error())
+	}
+
+	// whisper (optional, on-demand speech-to-text)
+	if ws := a.whisperStatus(); ws.Available {
+		add("whisper", true, ws.Binary+"  "+filepath.Base(ws.Model))
+	} else {
+		add("whisper", false, ws.Detail+" (optional)")
 	}
 
 	// caffeinate

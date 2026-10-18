@@ -8,7 +8,7 @@
 ## 1. Dependencies
 
 ```bash
-brew install llama.cpp go
+brew install llama.cpp go whisper-cpp ffmpeg   # whisper-cpp/ffmpeg: optional, for transcribe
 ```
 
 `llama.cpp` ships with Metal support on Apple silicon — no extra flags needed.
