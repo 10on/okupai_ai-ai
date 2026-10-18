@@ -104,9 +104,9 @@ one batch per profile, don't switch mid-task.
 
 | Profile | Model | Use for | Load (measured) |
 |---|---|---|---|
-| `fast` | Qwen3-4B-Instruct-2507 Q4_K_M | short Q&A, transforms, batch items | ~5 s; 46–77 tok/s |
-| `coding` | Qwen3-Coder-30B-A3B Q4_K_M | code drafts, agentic tasks | tens of s |
-| `browser` | Qwen3.5-27B Q4_K_M + mmproj (vision) | page/screenshot understanding | ~12 s; one vision browse step 90–100 s |
+| `fast` | Qwen3-4B-Instruct-2507 Q4_K_M | short Q&A, transforms, batch items | 5 s; ~76 tok/s |
+| `coding` | Qwen3-Coder-30B-A3B Q4_K_M | code drafts, agentic tasks | 11 s; ~74 tok/s |
+| `browser` | Qwen3.5-27B Q4_K_M + mmproj (vision) | page/screenshot understanding | 8–12 s; 9 tok/s, one vision browse step 90–100 s |
 | `brain` | Qwen3.5-122B-A10B UD-IQ3_S (~46.6 GB), ctx 32k, KV q8_0 | hardest reasoning, long-doc synthesis | minutes (not yet live-tested) |
 | `heavy` | Qwen2.5-72B-Instruct Q4_K_M (~47 GB), ctx 8k, KV q8_0 | — | to be removed after `brain` is validated |
 
@@ -146,6 +146,7 @@ profile, mode, duration, model load time, input/output size, ok. `local_feedback
 
 - Whisper service on the Mac (mlx `whisper-large-v3-turbo` is already in the HF cache) →
   `services.whisper` in `local_capabilities`; until then `local-transcribe` stops.
+- `browser` is slow (dense 27B, 9 tok/s): evaluate a multimodal A3B MoE (e.g. Qwen3.6-35B-A3B + mmproj) as a faster browser profile.
 - Live validation of `brain` (needs a real `aimode on brain`), then remove `heavy` and its 47 GB.
 - "Busy" flag for interactive Mac use.
 - Mirror the skills for Codex if it is used beyond fallback.
