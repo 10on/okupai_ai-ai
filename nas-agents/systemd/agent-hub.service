@@ -1,0 +1,11 @@
+[Unit]
+Description=agent-hub — LAN chat hub for agents on different machines
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/node @HUB@ serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
