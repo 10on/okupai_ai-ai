@@ -2,7 +2,7 @@
 # Hub side (run on the NAS):    install-hub.sh serve
 #   installs and starts agent-hub as a systemd --user service (port HUB_PORT, default 7800)
 # Agent side (every machine):   install-hub.sh agent <name> <hub-url> <token> [note]
-#   registers the agent-hub MCP bridge in Claude Code and Codex. Create the token on the NAS
+#   registers the hub's HTTP MCP endpoint + push hook in Claude Code and Codex. Create the token on the NAS
 #   with:  node nas-agents/hub/hub.mjs add-agent <name>
 set -euo pipefail
 HUB="$(cd "$(dirname "${BASH_SOURCE[0]}")/../hub" && pwd)/hub.mjs"
@@ -16,25 +16,29 @@ serve)
     systemctl --user --no-pager --lines=0 status agent-hub.service | head -3
     ;;
 agent)
+    # Pure HTTP: nothing but curl on the client (curl.exe ships with Windows 10+).
     NAME="${2:?name}"; URL="${3:?hub url, e.g. http://192.168.8.x:7800}"; TOKEN="${4:?token}"; NOTE="${5:-}"
+    URL="${URL%/}"
     claude mcp remove -s user agent-hub >/dev/null 2>&1 || true
-    claude mcp add -s user agent-hub -e HUB_URL="$URL" -e HUB_TOKEN="$TOKEN" -e HUB_NOTE="$NOTE" -- node "$HUB" mcp
+    claude mcp add -s user --transport http agent-hub "$URL/mcp" \
+        -H "Authorization: Bearer $TOKEN" -H "X-Hub-Note: $NOTE"
+    # Codex reads the bearer token from an env var — export HUB_TOKEN in the shell profile.
     codex mcp remove agent-hub >/dev/null 2>&1 || true
-    codex mcp add agent-hub --env HUB_URL="$URL" --env HUB_TOKEN="$TOKEN" --env HUB_NOTE="$NOTE" -- node "$HUB" mcp
+    codex mcp add agent-hub --url "$URL/mcp" --bearer-token-env-var HUB_TOKEN
     # Claude Code hooks: push new messages into a busy agent (Codex has no equivalent — it polls hub_inbox)
     SETTINGS=~/.claude/settings.json
     [[ -f "$SETTINGS" ]] || echo '{}' > "$SETTINGS"
-    HUB_URL="$URL" HUB_TOKEN="$TOKEN" node -e '
-      const fs=require("fs"),f=process.argv[1],s=JSON.parse(fs.readFileSync(f,"utf8"));
-      const cmd=`HUB_URL=${process.env.HUB_URL} HUB_TOKEN=${process.env.HUB_TOKEN} node ${process.argv[2]} hook`;
+    node -e '
+      const fs=require("fs"),[f,url,token]=process.argv.slice(1),s=JSON.parse(fs.readFileSync(f,"utf8"));
+      const cmd=`curl -s -m 2 -X POST --data-binary @- -H "Authorization: Bearer ${token}" ${url}/hook`;
       s.hooks??={};
       for(const ev of ["PostToolUse","UserPromptSubmit","Stop"]){
-        s.hooks[ev]=(s.hooks[ev]||[]).filter(g=>!g.hooks?.some(h=>h.command?.includes("hub.mjs hook")));
+        s.hooks[ev]=(s.hooks[ev]||[]).filter(g=>!g.hooks?.some(h=>/\/hook\b|hub\.mjs hook/.test(h.command||"")));
         s.hooks[ev].push({hooks:[{type:"command",command:cmd,timeout:5}]});
       }
-      fs.writeFileSync(f,JSON.stringify(s,null,2));' "$SETTINGS" "$HUB"
+      fs.writeFileSync(f,JSON.stringify(s,null,2));' "$SETTINGS" "$URL" "$TOKEN"
     chmod 600 "$SETTINGS"
-    echo "registered agent-hub as '$NAME'"
+    echo "registered agent-hub as '$NAME' (HTTP). Codex: export HUB_TOKEN=<token>"
     ;;
 *) echo "usage: install-hub.sh serve | agent <name> <hub-url> <token> [note]" >&2; exit 2 ;;
 esac

@@ -87,6 +87,14 @@ function serve() {
     nextId = (history.at(-1)?.id || 0) + 1;
   } catch { /* first run */ }
 
+  const drainFor = n => {
+    const m = unread(n);
+    if (m.length) {
+      cursors[n] = m.at(-1).id; fs.writeFileSync(CURSORS_FILE, JSON.stringify(cursors));
+      log('deliver', { agent: n, ids: m.map(x => x.id), cursor: cursors[n] });
+    }
+    return m;
+  };
   const wake = name => { for (const f of waiters.get(name) || []) f(); };
   const json = (res, code, body) => {
     res.writeHead(code, { 'content-type': 'application/json' });
@@ -122,6 +130,36 @@ function serve() {
       if (!prev || Date.now() - prev.seen >= ONLINE_MS || prev.ip !== clientIp(req)) log('presence', { agent: me, state: 'online', ip: clientIp(req), note: body.note ?? prev?.note ?? '' });
       presence.set(me, { ip: clientIp(req), note: body.note ?? prev?.note ?? '', seen: Date.now() });
 
+      if (url.pathname === '/hook' && req.method === 'POST') {
+        // Claude Code hook without Node on the client: the hook command just POSTs its stdin here
+        // (curl -s -X POST --data-binary @- -H "Authorization: Bearer ..." <hub>/hook).
+        const msgs = drainFor(me);
+        info = { delivered: msgs.length, event: body.hook_event_name };
+        if (!msgs.length) { res.writeHead(200); return res.end(); }
+        const out = hookOutput(body, msgs);
+        log('hook', { agent: me, event: body.hook_event_name, ids: msgs.map(m => m.id), action: out ? (out.decision || 'inject') : 'none' });
+        return out ? json(res, 200, out) : (res.writeHead(200), res.end());
+      }
+
+      if (url.pathname === '/mcp') {
+        // MCP over streamable HTTP (JSON responses, stateless): `claude mcp add --transport http`.
+        if (req.method !== 'POST') return json(res, 405, { error: 'POST only' });
+        const note = String(req.headers['x-hub-note'] || '');
+        if (note) presence.set(me, { ...presence.get(me), note });
+        const mlog = (ev, f) => log(ev, { agent: me, ...f });
+        const selfCall = async (method, p, b) => {
+          const r = await fetch(`http://127.0.0.1:${port}${p}`, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: b ? JSON.stringify(b) : undefined, signal: AbortSignal.timeout(65_000) });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.error || `hub ${r.status}`);
+          return d;
+        };
+        const handle = mcpHandler(selfCall, mlog, note);
+        const msgs = Array.isArray(body) ? body : [body];
+        const out = (await Promise.all(msgs.map(handle))).filter(Boolean);
+        if (!out.length) { res.writeHead(202); return res.end(); }
+        return json(res, 200, Array.isArray(body) ? out : out[0]);
+      }
+
       if (url.pathname === '/agents') {
         const now = Date.now();
         return json(res, 200, Object.keys(agents).map(n => {
@@ -149,15 +187,7 @@ function serve() {
       if (url.pathname === '/inbox') {
         // Long-poll: returns undelivered messages, waiting up to ?wait= seconds (max 55) for the first one.
         const wait = Math.min(Number(url.searchParams.get('wait') || 0), 55) * 1000;
-        const drain = () => {
-          const m = unread(me);
-          if (m.length) {
-            cursors[me] = m.at(-1).id; fs.writeFileSync(CURSORS_FILE, JSON.stringify(cursors));
-            log('deliver', { agent: me, ids: m.map(x => x.id), cursor: cursors[me] });
-          }
-          info = { delivered: m.length, waited_ms: Date.now() - t0 };
-          return m;
-        };
+        const drain = () => { const m = drainFor(me); info = { delivered: m.length, waited_ms: Date.now() - t0 }; return m; };
         if (unread(me).length || !wait) return json(res, 200, drain());
         let done = false;
         const finish = () => {
@@ -186,13 +216,84 @@ function serve() {
   }).listen(port, '0.0.0.0', () => log('start', { port, data: DATA, agents: Object.keys(loadAgents()), history: history.length, next_id: nextId }));
 }
 
+function hookOutput(input, msgs) {
+  const text = 'Messages from other agents via agent-hub (answer with hub_send if needed):\n' +
+    msgs.map(m => `[${m.ts}] ${m.from}${m.to === '*' ? ' (to all)' : ''}: ${m.text}`).join('\n');
+  if (input.hook_event_name === 'Stop') return input.stop_hook_active ? null : { decision: 'block', reason: text };
+  return { hookSpecificOutput: { hookEventName: input.hook_event_name, additionalContext: text } };
+}
+
 function clientLogger(side) {
   const who = process.env.HUB_NAME || os.hostname();
   return makeLogger(process.env.HUB_CLIENT_LOG || path.join(DATA, `client-${who}.log`), `${side}@${who}`, false);
 }
 
+// Shared MCP logic for the stdio bridge and the hub's own /mcp endpoint (streamable HTTP).
+// call(method, path, body) talks to the hub as the calling agent; note is published with each call.
+function mcpHandler(call, log, note) {
+  const tools = [
+    {
+      name: 'hub_agents',
+      description: 'List agents known to the LAN hub: online status, IP address, and the note each one published (e.g. how to fetch files from it).',
+      inputSchema: { type: 'object', properties: {} },
+      run: () => call('POST', '/agents', { note }),
+    },
+    {
+      name: 'hub_send',
+      description: 'Send a message to another agent, or to everyone with to="*". Returns immediately; the receiver reads it whenever it next checks (asynchronous — do not wait for an answer, carry on with your work). To share files, send the path and how to reach it (host IP from hub_agents); the receiver pulls it directly (scp/rsync/http) — the hub does not carry files.',
+      inputSchema: { type: 'object', properties: { to: { type: 'string', description: 'agent name or "*"' }, text: { type: 'string' }, reply_to: { type: 'number', description: 'id of the message you are answering' } }, required: ['to', 'text'] },
+      run: a => call('POST', '/send', { to: a.to, text: a.text, reply_to: a.reply_to, note }),
+    },
+    {
+      name: 'hub_inbox',
+      description: 'Fetch messages addressed to you that you have not seen yet (non-blocking by default; each message is delivered once, older ones stay in hub_history). Check it at natural pauses. wait_seconds (0-55) is optional and only for when you have nothing else to do.',
+      inputSchema: { type: 'object', properties: { wait_seconds: { type: 'number' } } },
+      run: a => call('GET', `/inbox?wait=${Math.max(0, Math.min(Number(a.wait_seconds) || 0, 55))}`),
+    },
+    {
+      name: 'hub_history',
+      description: 'Recent chat history involving you (sent, received, broadcast).',
+      inputSchema: { type: 'object', properties: { limit: { type: 'number' } } },
+      run: a => call('GET', `/history?limit=${Number(a.limit) || 30}`),
+    },
+  ];
+
+  // Returns the JSON-RPC response object, or null for notifications.
+  return async m => {
+    if (!m.method || m.id === undefined) return null;
+    log('rpc', { id: m.id, method: m.method, ...(m.method === 'tools/call' ? { tool: m.params?.name, args: m.params?.arguments } : {}) });
+    const ok = result => ({ jsonrpc: '2.0', id: m.id, result });
+    const fail = (code, message) => ({ jsonrpc: '2.0', id: m.id, error: { code, message } });
+    switch (m.method) {
+      case 'initialize':
+        return ok({
+          protocolVersion: m.params?.protocolVersion || '2025-06-18',
+          capabilities: { tools: {} },
+          serverInfo: { name: 'agent-hub', version: '0.1.0' },
+          instructions: 'LAN chat with agents on other machines. Use only when the user asks you to talk to or hand work to another agent.',
+        });
+      case 'ping': return ok({});
+      case 'tools/list': return ok({ tools: tools.map(({ run, ...t }) => t) });
+      case 'tools/call': {
+        const t = tools.find(x => x.name === m.params?.name);
+        if (!t) return fail(-32602, 'unknown tool');
+        try {
+          const out = await t.run(m.params.arguments || {});
+          log('tool_ok', { tool: t.name, result: out });
+          return ok({ content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false });
+        } catch (e) {
+          log('tool_error', { tool: t.name, error: String(e.message || e) });
+          return ok({ content: [{ type: 'text', text: String(e.message || e) }], isError: true });
+        }
+      }
+      default: return fail(-32601, 'method not found');
+    }
+  };
+}
+
 // ---------------------------------------------------------------- MCP bridge
 
+// stdio flavour, for clients/hosts that cannot use the HTTP endpoint directly.
 function mcp() {
   const base = (process.env.HUB_URL || '').replace(/\/$/, '');
   const token = process.env.HUB_TOKEN || '';
@@ -222,66 +323,14 @@ function mcp() {
     }
   };
 
-  const tools = [
-    {
-      name: 'hub_agents',
-      description: 'List agents known to the LAN hub: online status, IP address, and the note each one published (e.g. how to fetch files from it).',
-      inputSchema: { type: 'object', properties: {} },
-      run: () => call('POST', '/agents', { note }),
-    },
-    {
-      name: 'hub_send',
-      description: 'Send a message to another agent, or to everyone with to="*". Returns immediately; the receiver reads it whenever it next checks (asynchronous — do not wait for an answer, carry on with your work). To share files, send the path and how to reach it (host IP from hub_agents); the receiver pulls it directly (scp/rsync/http) — the hub does not carry files.',
-      inputSchema: { type: 'object', properties: { to: { type: 'string', description: 'agent name or "*"' }, text: { type: 'string' }, reply_to: { type: 'number', description: 'id of the message you are answering' } }, required: ['to', 'text'] },
-      run: a => call('POST', '/send', { to: a.to, text: a.text, reply_to: a.reply_to, note }),
-    },
-    {
-      name: 'hub_inbox',
-      description: 'Fetch messages addressed to you that you have not seen yet (non-blocking by default; each message is delivered once, older ones stay in hub_history). Check it at natural pauses. wait_seconds (0-55) is optional and only for when you have nothing else to do.',
-      inputSchema: { type: 'object', properties: { wait_seconds: { type: 'number' } } },
-      run: a => call('GET', `/inbox?wait=${Math.max(0, Math.min(Number(a.wait_seconds) || 0, 55))}`),
-    },
-    {
-      name: 'hub_history',
-      description: 'Recent chat history involving you (sent, received, broadcast).',
-      inputSchema: { type: 'object', properties: { limit: { type: 'number' } } },
-      run: a => call('GET', `/history?limit=${Number(a.limit) || 30}`),
-    },
-  ];
 
-  const send = m => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\n');
-  const rl = readline.createInterface({ input: process.stdin });
-  rl.on('line', async line => {
+  const handle = mcpHandler(call, log, note);
+  const send = m => process.stdout.write(JSON.stringify(m) + '\n');
+  readline.createInterface({ input: process.stdin }).on('line', async line => {
     let m;
-    try { m = JSON.parse(line); } catch { return send({ id: null, error: { code: -32700, message: 'parse error' } }); }
-    if (!m.method || m.id === undefined) return; // notifications / responses
-    log('rpc', { id: m.id, method: m.method, ...(m.method === 'tools/call' ? { tool: m.params?.name, args: m.params?.arguments } : {}) });
-    const reply = (result, error) => send({ id: m.id, ...(error ? { error } : { result }) });
-    switch (m.method) {
-      case 'initialize':
-        return reply({
-          protocolVersion: m.params?.protocolVersion || '2025-06-18',
-          capabilities: { tools: {} },
-          serverInfo: { name: 'agent-hub', version: '0.1.0' },
-          instructions: 'LAN chat with agents on other machines. Use only when the user asks you to talk to or hand work to another agent.',
-        });
-      case 'ping': return reply({});
-      case 'tools/list':
-        return reply({ tools: tools.map(({ run, ...t }) => t) });
-      case 'tools/call': {
-        const t = tools.find(x => x.name === m.params?.name);
-        if (!t) return reply(null, { code: -32602, message: 'unknown tool' });
-        try {
-          const out = await t.run(m.params.arguments || {});
-          log('tool_ok', { tool: t.name, result: out });
-          return reply({ content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: false });
-        } catch (e) {
-          log('tool_error', { tool: t.name, error: String(e.message || e) });
-          return reply({ content: [{ type: 'text', text: String(e.message || e) }], isError: true });
-        }
-      }
-      default: return reply(null, { code: -32601, message: 'method not found' });
-    }
+    try { m = JSON.parse(line); } catch { return send({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } }); }
+    const r = await handle(m);
+    if (r) send(r);
   });
 }
 
